@@ -23,18 +23,20 @@ jobs:
         id: tag_version
         run: |
           git fetch --tags
-          today=$(date -u +%Y.%m.%d)
-          count=$(git tag -l "v${today}*" | wc -l | tr -d ' ')
-          if [ "$count" -eq 0 ]; then
-            new_tag="v${today}"
-          else
-            new_tag="v${today}-$((count+1))"
-          fi
+          latest=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
+          latest=${latest:-v0.0.0}
+          IFS='.' read -r major minor patch <<< "${latest#v}"
+          patch=$((patch+1))
+          new_tag="v${major}.${minor}.${patch}"
           echo "new_tag=$new_tag" >> "$GITHUB_OUTPUT"
           git tag "$new_tag"
           git push origin "$new_tag"
 
       - name: create release
-        run: gh release create "${{ steps.tag_version.outputs.new_tag }}" --generate-notes
+        run: |
+          release_date=$(date -u +%Y-%m-%d)
+          gh release create "${{ steps.tag_version.outputs.new_tag }}" \
+            --title "${{ steps.tag_version.outputs.new_tag }} — ${release_date}" \
+            --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
