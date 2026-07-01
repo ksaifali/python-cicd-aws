@@ -44,20 +44,27 @@ jobs:
             core.setOutput("label_value", bump);
 
 
-      - name: create tag to release
+      - name: Compute next tag
         id: tag_version
-        uses: mathieudutour/github-tag-action@v6.1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: ${{ steps.bump_label.outputs.label_value }}
-          dry_run: ${{ github.event_name == 'pull_request' }}
-          tag_prefix: v
-
+        run: |
+          git fetch --tags
+          latest=$(git tag --sort=-v:refname | head -n1)
+          latest=${latest:-v0.0.0}
+          IFS='.' read -r major minor patch <<< "${latest#v}"
+          case "${{ steps.bump_label.outputs.label_value }}" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            patch) patch=$((patch+1)) ;;
+          esac
+          new_tag="v${major}.${minor}.${patch}"
+          echo "new_tag=$new_tag" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            git tag "$new_tag"
+            git push origin "$new_tag"
+          fi
 
       - name: create release
-        uses: ncipollo/release-action@v1
         if: ${{ github.event_name != 'pull_request' }}
-        with:
-          tag: ${{ steps.tag_version.outputs.new_tag }}
-          name: Release ${{ steps.tag_version.outputs.new_tag }}
-          body: ${{ steps.tag_version.outputs.changelog }}
+        run: gh release create "${{ steps.tag_version.outputs.new_tag }}" --generate-notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
