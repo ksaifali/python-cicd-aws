@@ -10,6 +10,11 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -40,9 +45,15 @@ jobs:
               .filter(l => l.startsWith("bump:"))
               .map(l => l.slice("bump:".length));
             const order = ["major", "minor", "patch", "ignore"];
-            const bump = order.find(o => bumpLabels.includes(o)) || "patch";
-            core.setOutput("label_value", bump);
+            const bump = order.find(o => bumpLabels.includes(o));
+            core.setOutput("label_value", bump || "patch");
+            core.setOutput("had_label", Boolean(bump));
 
+      - name: Require bump label on PRs
+        if: ${{ github.event_name == 'pull_request' && steps.bump_label.outputs.had_label != 'true' }}
+        run: |
+          echo "::error::No bump:major, bump:minor, bump:patch, or bump:ignore label found on this PR. Add one before merging."
+          exit 1
 
       - name: Compute next tag
         id: tag_version
