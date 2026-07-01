@@ -76,6 +76,10 @@ jobs:
 
       - name: create release
         if: ${{ github.event_name != 'pull_request' }}
-        run: gh release create "${{ steps.tag_version.outputs.new_tag }}" --generate-notes
+        run: |
+          release_date=$(date -u +%Y-%m-%d)
+          gh release create "${{ steps.tag_version.outputs.new_tag }}" \
+            --title "${{ steps.tag_version.outputs.new_tag }} — ${release_date}" \
+            --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
