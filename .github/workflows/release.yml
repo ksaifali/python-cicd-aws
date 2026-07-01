@@ -19,12 +19,28 @@ jobs:
 
       - name: Get bump version
         id: bump_label
-        uses: SamirMarin/get-labels-action@v0
+        uses: actions/github-script@v7
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          label_key: bump
-          label_value_order: "patch,minor,major,ignore"
-          default_label_value: patch
+          script: |
+            let labels = [];
+            if (context.payload.pull_request) {
+              labels = context.payload.pull_request.labels.map(l => l.name);
+            } else {
+              const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+              });
+              if (prs.data.length > 0) {
+                labels = prs.data[0].labels.map(l => l.name);
+              }
+            }
+            const bumpLabels = labels
+              .filter(l => l.startsWith("bump:"))
+              .map(l => l.slice("bump:".length));
+            const order = ["major", "minor", "patch", "ignore"];
+            const bump = order.find(o => bumpLabels.includes(o)) || "patch";
+            core.setOutput("label_value", bump);
 
 
       - name: create tag to release
