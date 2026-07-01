@@ -26,13 +26,14 @@ jobs:
             if (context.payload.pull_request) {
               labels = context.payload.pull_request.labels.map(l => l.name);
             } else {
-              const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                commit_sha: context.sha,
-              });
-              if (prs.data.length > 0) {
-                labels = prs.data[0].labels.map(l => l.name);
+              const match = (context.payload.head_commit?.message || "").match(/\(#(\d+)\)/);
+              if (match) {
+                const pr = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: Number(match[1]),
+                });
+                labels = pr.data.labels.map(l => l.name);
               }
             }
             const bumpLabels = labels
